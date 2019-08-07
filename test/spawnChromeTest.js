@@ -65,4 +65,63 @@ QUnit.module("spawnChrome", () => {
       }
     },
   );
+
+  QUnit.test(
+    "load page",
+    async assert => {
+      const chrome = spawnChrome({ headless: false });
+      try {
+        const browser = chrome.connection;
+
+        browser.on("error", err => {
+          assert.ok(false, `browser error ${err.stack}`);
+        });
+
+        await browser.send("Security.setIgnoreCertificateErrors", {
+          ignore: true,
+        });
+
+        const { targetId } = await browser.send("Target.createTarget", {
+          url: "about:blank",
+        });
+
+        await browser.send("Target.activateTarget", { targetId });
+
+        const page = await browser.attachToTarget(targetId);
+
+        page.on("error", err => {
+          assert.ok(false, `target connection error ${err.stack}`);
+        });
+
+        page.on('Network.responseReceived', (result) => {
+          console.log('responseRecieved', result);
+        });
+        page.on('Network.requestWillBeSent', (result) => {
+          console.log('responseRecieved', result);
+        });
+        page.on('Page.frameNavigated', (result) => {
+          console.log('responseRecieved', result);
+        });
+        page.on('Page.loadEventFired', (result) => {
+          console.log('responseRecieved', result);
+        });
+        
+        const { errorText } = await page.send('Page.navigate', { url: 'https://www.google.com' });
+
+        if (errorText) {
+          console.error(`Navigation Failed: ${errorText}`);
+        }
+
+        await page.until('Page.loadEventFired');
+
+        await browser.send("Target.closeTarget", { targetId });
+
+        await chrome.close();
+
+        assert.ok(chrome.hasExited());
+      } finally {
+        await chrome.dispose();
+      }
+    },
+  );
 });
